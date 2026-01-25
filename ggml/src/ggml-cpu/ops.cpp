@@ -289,34 +289,30 @@ static void ggml_compute_forward_dup_to_q(
     const int ir0 = dr * ith;
     const int ir1 = MIN(ir0 + dr, nr);
 
-    if (ggml_is_contiguous(dst) &&
-            nb00 == sizeof(src_t) &&
-            ggml_get_type_traits_cpu(dst->type)->from_float) {
+    if (nb00 == sizeof(src_t) && ggml_get_type_traits_cpu(dst->type)->from_float) {
         // casting non-quantized types --> intermediate f32 --> quantized
         ggml_from_float_t const quantize_row_q = ggml_get_type_traits_cpu(dst->type)->from_float;
         float * src0_f32 = (float *) params->wdata + (ne00 + CACHE_LINE_SIZE_F32) * ith;
 
-        size_t id = 0;
-        size_t rs = nb0 * (ne00 / ggml_blck_size(dst->type));
-        char * dst_ptr = (char *) dst->data;
-
         for (int i03 = 0; i03 < ne03; i03++) {
             for (int i02 = 0; i02 < ne02; i02++) {
-                id += rs * ir0;
                 for (int i01 = ir0; i01 < ir1; i01++) {
                     const src_t * src0_ptr = (src_t *) ((char *) src0->data + i01*nb01 + i02*nb02 + i03*nb03);
+                    char * dst_ptr = (char *) dst->data + i01*nb1 + i02*nb2 + i03*nb3;
 
                     for (int i00 = 0; i00 < ne00; i00++) {
                         src0_f32[i00] = type_conversion_table<src_t>::to_f32(src0_ptr[i00]);
                     }
 
-                    quantize_row_q(src0_f32, dst_ptr + id, ne00);
-                    id += rs;
+                    quantize_row_q(src0_f32, dst_ptr, ne00);
                 }
-                id += rs * (ne01 - ir1);
             }
         }
     } else {
+        printf("DEBUG: not implemented dup_to_q\n");
+        printf("DEBUG: src0->type: %s, dst->type: %s\n", ggml_type_name(src0->type), ggml_type_name(dst->type));
+        printf("DEBUG: contiguous(dst): %d, nb00: %ld, sizeof(src_t): %ld\n", (int)ggml_is_contiguous(dst), (long)nb00, (long)sizeof(src_t));
+        printf("DEBUG: from_float: %p\n", (void*)ggml_get_type_traits_cpu(dst->type)->from_float);
         // printf("%s %s\n", ggml_type_name(src0->type), ggml_type_name(dst->type));
         GGML_ABORT("not implemented");
     }
